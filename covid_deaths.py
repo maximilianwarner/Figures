@@ -23,13 +23,14 @@ df_raw.drop(['Province/State', 'Lat', 'Long'], axis=1, inplace=True)
 df = df_raw.groupby(['Country/Region']).sum().transpose().copy()
 df.index = pd.to_datetime(df.index)
 
-# countries of interest
+# countries of interest. first_death is the number that dies on the first day
 countries = {'Italy':{'country_key':'Italy', 'first_death':1},
              'Spain':{'country_key':'Spain', 'first_death':1},
-             'United Kingdom':{'country_key':'U.K.', 'first_death':1},
+             'United Kingdom':{'country_key':'UK', 'first_death':1},
              'Korea, South':{'country_key':'S. Korea', 'first_death':1},
              'Norway':{'country_key':'Norway', 'first_death':3},
              'US':{'country_key':'USA', 'first_death':1},
+             'Sweden':{'country_key':'Sweden', 'first_death':1},
              'Germany':{'country_key':'Germany', 'first_death':2}}
 
 # get the date for a source info stamp
@@ -52,7 +53,7 @@ for country, info in countries.items():
     idx_first = df.index[df[country] == first]
 
     # set colours
-    if key == 'U.K.':
+    if key == 'UK':
         line_colour = 'red'
         line_zorder = 2
     else:
@@ -69,7 +70,7 @@ for country, info in countries.items():
 
     # annotate the lines with the country names
     axes[0].text(x_last - idx_first[0].dayofyear + 0.5, y_last, key, color=line_colour, alpha=1.0)
-    axes[1].text(x_last + 0.5, y_last + offset, key, color=line_colour, alpha=1.0)
+    axes[1].text(x_last + 0.5, y_last, key, color=line_colour, alpha=1.0)
 
 # set the title and scales
 axes[0].set_title('Number of Deaths, versus days since first death', loc='left', alpha=0.7)
