@@ -75,13 +75,13 @@ def get_countries():
                  'Japan': {'country_key': 'JP',
                            'D_01': 1,
                            'Plot_line': True,
-                           'D_10': 19,
+                           'D_10': 27,
                            'marker': 'blue',
                            'pop': 126476461},
                  'Korea, South': {'country_key': 'KR',
                                   'D_01': 1,
                                   'Plot_line': True,
-                                  'D_10': 10,
+                                  'D_10': 16,
                                   'marker': 'red',
                                   'pop': 51269185},
                  'Netherlands': {'country_key': 'NL',
@@ -300,7 +300,7 @@ def scatter_plot(ax, x, y, colour):
 
 
 def plot_func(df, countries, plot_params, line_style=True, time_abs=True, d_01_type=True, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None, ax=None):
+              best_fit_poly=None, best_fit_exp=None, labels=True, ax=None):
 
     if ax is None:
         # set the figure
@@ -338,11 +338,11 @@ def plot_func(df, countries, plot_params, line_style=True, time_abs=True, d_01_t
             if inc_line_plot is True:
                 line_plot(ax, x, y, colour)
                 # add the labels
-                if time_abs is False:
+                if labels is True:
                     line_plot_country_labels(ax, x, y, key, colour)
         else:
             scatter_plot(ax, x, y, colour)
-            if time_abs is False:
+            if labels is True:
                 scatter_plot_country_labels(ax, x, y, key, colour)
 
             if best_fit_poly is not None and country in best_fit_poly.keys():
@@ -396,7 +396,7 @@ def main():
 
 
     plot_func(df, countries, plot_params_1, line_style=True, time_abs=True, d_01_type=True, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None, ax=None)
+              best_fit_poly=None, best_fit_exp=None, labels=True, ax=None)
     render_save_figure(plot_params_1, auto_close=True)
 
     # plot 2: Line plot of Number of deaths versus days since first death
@@ -408,7 +408,7 @@ def main():
                    'save_name': 'Days_since_first'}
 
     plot_func(df, countries, plot_params_2, line_style=True, time_abs=False, d_01_type=True, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None, ax=None)
+              best_fit_poly=None, best_fit_exp=None, labels=True, ax=None)
 
     render_save_figure(plot_params_2, auto_close=True)
 
@@ -440,7 +440,7 @@ def main():
                       'Netherlands':15}
 
     plot_func(df, countries, plot_params_3, line_style=False, time_abs=False, d_01_type=False, pop_type=False,
-              best_fit_poly=best_fit_poly_3, best_fit_exp=best_fit_exp_3, ax=None)
+              best_fit_poly=best_fit_poly_3, best_fit_exp=best_fit_exp_3, labels=True, ax=None)
     render_save_figure(plot_params_3, auto_close=True)
 
     # plot 4: Number of deaths versus days since 10th death scaled to population
@@ -452,7 +452,7 @@ def main():
                    'save_name': 'Per_cap_rel_tenth'}
 
     plot_func(df, countries, plot_params_4, line_style=False, time_abs=False, d_01_type=False, pop_type=True,
-              best_fit_poly=None, best_fit_exp=None, ax=None)
+              best_fit_poly=None, best_fit_exp=None, labels=True, ax=None)
     render_save_figure(plot_params_4, auto_close=True)
 
     # plot 5: Line plot of Number of deaths versus days since first death
@@ -464,7 +464,7 @@ def main():
                    'save_name': 'Days_since_tenth_line'}
 
     plot_func(df, countries, plot_params_5, line_style=True, time_abs=False, d_01_type=False, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None, ax=None)
+              best_fit_poly=None, best_fit_exp=None, labels=True, ax=None)
     render_save_figure(plot_params_5, auto_close=True)
 
 if __name__ == "__main__":
