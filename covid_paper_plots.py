@@ -11,6 +11,8 @@
    Data is taken from their Github. https://github.com/CSSEGISandData/COVID-19
 """
 import datetime
+import os
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,10 +21,10 @@ from sklearn import linear_model
 def get_countries():
     countries = {'Austria': {'country_key': 'AT',
                              'D_01': 1,
-                             'Plot_line': False,
+                             'Plot_line': True,
                              'D_10': 8,
                              'marker': 'dimgray',
-                             'pop': 83783942},
+                             'pop': 900600},
                  'Belgium': {'country_key': 'BE',
                              'D_01': 3,
                              'Plot_line': False,
@@ -38,12 +40,12 @@ def get_countries():
                  'Denmark': {'country_key': 'DK',
                              'D_01': 1,
                              'Plot_line': False,
-                             'D_10': 9,
-                             'marker': 'dimgray',
+                             'D_10': 13,
+                             'marker': 'red',
                              'pop': 83783942},
                  'France': {'country_key': 'FR',
                             'D_01': 1,
-                            'Plot_line': False,
+                            'Plot_line': True,
                             'D_10': 11,
                             'marker': 'dimgray',
                             'pop': 65273511},
@@ -51,11 +53,10 @@ def get_countries():
                              'D_01': 2,
                              'Plot_line': True,
                              'D_10': 9,
-                             'marker': 'dimgray',
+                             'marker': 'red',
                              'pop': 5792202},
-                 'Greece': {'country_key': 'GR',
-                            'D_01': 1,
-                            'Plot_line': False,
+                 'Greece': {'country_key': 'GR',                           'D_01': 1,
+                            'Plot_line': True,
                             'D_10': 13,
                             'marker': 'dimgray',
                             'pop': 10423054},
@@ -75,13 +76,13 @@ def get_countries():
                            'D_01': 1,
                            'Plot_line': True,
                            'D_10': 19,
-                           'marker': 'green',
+                           'marker': 'blue',
                            'pop': 126476461},
                  'Korea, South': {'country_key': 'KR',
                                   'D_01': 1,
                                   'Plot_line': True,
                                   'D_10': 10,
-                                  'marker': 'black',
+                                  'marker': 'red',
                                   'pop': 51269185},
                  'Netherlands': {'country_key': 'NL',
                                  'D_01': 1,
@@ -111,13 +112,13 @@ def get_countries():
                             'D_01': 1,
                             'Plot_line': True,
                             'D_10': 16,
-                            'marker': 'dimgray',
+                            'marker': 'blue',
                             'pop': 10099265},
                  'Switzerland': {'country_key': 'CH',
                                  'D_01': 1,
-                                 'Plot_line': False,
+                                 'Plot_line': True,
                                  'D_10': 14,
-                                 'marker': 'dimgray',
+                                 'marker': 'red',
                                  'pop': 8654622},
                  'United Kingdom': {'country_key': 'UK',
                                     'D_01': 1,
@@ -178,6 +179,14 @@ def line_plot_country_labels(ax, x, y, key, colour):
     # annotate the lines with the country names
     ax.text(x_last + 0.5, y_last, key, color=colour, alpha=1.0)
 
+def scatter_plot_country_labels(ax, x, y, key, colour):
+    # get the location of the end of each line
+    x_last = x[-1]
+    y_last = y[-1]
+
+    # annotate the lines with the country names
+    ax.text(x_last + 0.5, y_last, key, color=colour, alpha=1.0)
+
 
 def plot_best_fit_poly(ax, df, country, d_num, lower_fit_range, plot_params):
     # get the x and y data
@@ -203,6 +212,8 @@ def plot_best_fit_poly(ax, df, country, d_num, lower_fit_range, plot_params):
     y_log_fit = np.exp(c_log) * (x_fit ** m_log)
 
     ax.plot(x_fit, y_log_fit, 'k--', alpha=0.8)
+    label_str = 'd = {}'.format(np.round(m_log,2))
+    ax.text(x_fit[-1] + 1, y_log_fit[-1], label_str)
 
 
 def plot_best_fit_exp(ax, df, countries, d_01_type, best_fit_exp, plot_params):
@@ -289,9 +300,11 @@ def scatter_plot(ax, x, y, colour):
 
 
 def plot_func(df, countries, plot_params, line_style=True, time_abs=True, d_01_type=True, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None):
-    # set the figure
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7,5))
+              best_fit_poly=None, best_fit_exp=None, ax=None):
+
+    if ax is None:
+        # set the figure
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7,5))
 
     # plot each country
     for country, info in countries.items():
@@ -329,6 +342,9 @@ def plot_func(df, countries, plot_params, line_style=True, time_abs=True, d_01_t
                     line_plot_country_labels(ax, x, y, key, colour)
         else:
             scatter_plot(ax, x, y, colour)
+            if time_abs is False:
+                scatter_plot_country_labels(ax, x, y, key, colour)
+
             if best_fit_poly is not None and country in best_fit_poly.keys():
                 lower_fit_range = best_fit_poly[country]
                 plot_best_fit_poly(ax, df, country, d_num, lower_fit_range, plot_params)
@@ -340,14 +356,30 @@ def plot_func(df, countries, plot_params, line_style=True, time_abs=True, d_01_t
     # fix up the axes and cosmetics
     remove_data_ink(ax, plot_params)
 
+    return ax
+
+
+def render_save_figure(plot_params, auto_close=False):
+
     # same the image
     save_name = plot_params['save_name']
-    save_time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
-    file_name = 'fig_' + save_time + '_' + save_name + '.pdf'
-    plt.savefig(file_name)
 
-    # render the plot
-    plt.show()
+    if save_name is not None:
+        save_dir = 'Figures'
+        os.makedirs(save_dir, exist_ok=True)
+
+        save_time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+        file_name = 'fig_' + save_time + '_' + save_name + '.pdf'
+        file_path = os.path.join(save_dir, file_name)
+        plt.savefig(file_path)
+
+    if auto_close is False:
+        print('Close windows to end program')
+        plt.show()
+    else:
+        plt.show(block=False)
+
+    print('{} is done'.format(file_name))
 
 
 def main():
@@ -364,7 +396,8 @@ def main():
 
 
     plot_func(df, countries, plot_params_1, line_style=True, time_abs=True, d_01_type=True, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None)
+              best_fit_poly=None, best_fit_exp=None, ax=None)
+    render_save_figure(plot_params_1, auto_close=True)
 
     # plot 2: Line plot of Number of deaths versus days since first death
     plot_params_2 = {'x_lim':[0,60],
@@ -375,27 +408,40 @@ def main():
                    'save_name': 'Days_since_first'}
 
     plot_func(df, countries, plot_params_2, line_style=True, time_abs=False, d_01_type=True, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None)
+              best_fit_poly=None, best_fit_exp=None, ax=None)
+
+    render_save_figure(plot_params_2, auto_close=True)
 
     # plot 3: Number of deaths versus days since 10th death
-    plot_params_3 = {'x_lim':[0,40],
+    plot_params_3 = {'x_lim':[0,50],
                    'y_lim':[1,30000],
-                   'x_ticks':[0,15,30],
+                   'x_ticks':[0,10,20,30,40],
                    'y_ticks':[1,10,100, 1000, 10000],
                    'title':'Number of Deaths, versus days since tenth death',
                    'save_name': 'Days_since_tenth'}
 
     best_fit_poly_3 = {'Korea, South':10,
-                       'Italy':17}
+                       'Italy':19,
+                       'Switzerland':10,
+                       'Germany':15,
+                       'Denmark':7}
 
     best_fit_exp_3 = {'Korea, South': 'ALL',
                       'Norway': 'ALL',
                       'Japan': 'ALL',
                       'Italy': 17,
-                      'Spain': 20}
+                      'Spain': 20,
+                      'U.K.':20,
+                      'USA':20,
+                      'Switzerland':10,
+                      'Denmark': 'ALL',
+                      'Greece': 'ALL',
+                      'Germany':15,
+                      'Netherlands':15}
 
     plot_func(df, countries, plot_params_3, line_style=False, time_abs=False, d_01_type=False, pop_type=False,
-              best_fit_poly=best_fit_poly_3, best_fit_exp=best_fit_exp_3)
+              best_fit_poly=best_fit_poly_3, best_fit_exp=best_fit_exp_3, ax=None)
+    render_save_figure(plot_params_3, auto_close=True)
 
     # plot 4: Number of deaths versus days since 10th death scaled to population
     plot_params_4 = {'x_lim':[0,40],
@@ -406,7 +452,8 @@ def main():
                    'save_name': 'Per_cap_rel_tenth'}
 
     plot_func(df, countries, plot_params_4, line_style=False, time_abs=False, d_01_type=False, pop_type=True,
-              best_fit_poly=None, best_fit_exp=None)
+              best_fit_poly=None, best_fit_exp=None, ax=None)
+    render_save_figure(plot_params_4, auto_close=True)
 
     # plot 5: Line plot of Number of deaths versus days since first death
     plot_params_5 = {'x_lim':[0,40],
@@ -417,7 +464,8 @@ def main():
                    'save_name': 'Days_since_tenth_line'}
 
     plot_func(df, countries, plot_params_5, line_style=True, time_abs=False, d_01_type=False, pop_type=False,
-              best_fit_poly=None, best_fit_exp=None)
+              best_fit_poly=None, best_fit_exp=None, ax=None)
+    render_save_figure(plot_params_5, auto_close=True)
 
 if __name__ == "__main__":
     main()
