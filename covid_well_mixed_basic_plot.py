@@ -150,7 +150,7 @@ class AnimatedScatter(object):
         self.init_state = -0.5 + np.random.random((self.num_people, 4))
 
         # scale the velocities
-        self.init_state[:, :2] *= 3.9
+        self.init_state[:, :2] *= 4
 
         # now add the infection state and the time of infection
         self.init_state = np.hstack((self.init_state,
@@ -163,9 +163,10 @@ class AnimatedScatter(object):
         self.dt = 1. / 30  # 30fps
 
         # setup the figure and axes
-        self.fig = plt.figure()
-        self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        self.ax = self.fig.add_subplot(111, aspect='equal', autoscale_on=False, xlim=(-3.2, 3.2), ylim=(-2.4, 2.4))
+        self.fig = plt.figure(figsize=(4,12))
+        #self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        self.ax_1 = self.fig.add_subplot(211, aspect='equal', autoscale_on=False, xlim=(-2.1, 2.1), ylim=(-2.1, 2.1))
+        self.ax_2 = self.fig.add_subplot(212, aspect=30,autoscale_on=True, xlim=(0, 40), ylim=(0.1, 1))
 
         # setup FuncAnimation.
         self.ani = animation.FuncAnimation(self.fig, self.update, interval=5,
@@ -173,12 +174,13 @@ class AnimatedScatter(object):
 
     def setup_plot(self):
         """initial drawing of the scatter plot."""
-        # set up the colour scale we will use Blue (-1 immune) -> Green (0 susceptible) -> Red (1 infected)
+        # setup the colour scale we will use Blue (-1 immune) -> Green (0 susceptible) -> Red (1 infected)
         self.colors = [(0, 0, 1), (0, 1, 0), (1, 0, 0)]
         self.n_bins = 3
         self.cm = LinearSegmentedColormap.from_list('infections', self.colors, N=self.n_bins)
 
-        self.particles = self.ax.scatter([], [], c=[], s=25, edgecolors=None, vmin=-1, vmax=1, cmap=self.cm)
+        # setup the scatter plot for the people
+        self.people = self.ax_1.scatter([], [], c=[], s=25, edgecolors=None, vmin=-1, vmax=1, cmap=self.cm)
 
         # rect is the box edge
         self.rect = plt.Rectangle(self.box.bounds[::2],
@@ -186,9 +188,26 @@ class AnimatedScatter(object):
                                   self.box.bounds[3] - self.box.bounds[2],
                                   ec='none', lw=2, fc='none')
 
-        self.ax.add_patch(self.rect)
+        self.ax_1.add_patch(self.rect)
 
-        return self.particles, self.rect
+        # get rid of the spines
+        self.ax_1.tick_params(bottom="off", left="off")
+        edges = ['left', 'right', 'top', 'bottom']
+        for edge in edges:
+            self.ax_1.spines[edge].set_visible(False)
+
+
+
+        # set up the timeline plot
+        self.line, = self.ax_2.plot([], [], lw=2)
+        self.ax_2.set_yscale('log')
+
+        # set up the time, cumulative infected and infected arrays
+        self.t = []
+        self.cum_inf = []
+        self.inf = []
+
+        return self.people, self.rect, self.line,
 
     def update(self, i):
         """update the scatter plot."""
@@ -196,12 +215,25 @@ class AnimatedScatter(object):
 
         # update pieces of the animation
         self.rect.set_edgecolor('k')
-        self.particles.set_offsets(self.box.state[:, :2])
-        self.particles.set_array(self.box.state[:, 4])
+        self.people.set_offsets(self.box.state[:, :2])
+        self.people.set_array(self.box.state[:, 4])
 
-        return self.particles, self.rect
+        # get the number infected, and susceptible
+        infected_state = self.box.state[:, 4]
+        num_sus = infected_state[infected_state == 0].shape[0]
+        num_inf = infected_state[infected_state == 1].shape[0]
+
+        # append to the arrays as fractions of population
+        self.cum_inf.append(1 - num_sus/self.num_people)
+        self.inf.append(num_sus/self.num_people)
+        self.t.append(i*self.dt)
+
+        # updated the line plot
+        self.line.set_data(self.t, self.cum_inf)
+
+        return self.people, self.rect, self.line,
 
 
 if __name__ == '__main__':
-    a = AnimatedScatter(num_people=100, T_recover=100, frac_infect=0.1)
+    a = AnimatedScatter(num_people=100, T_recover=50, frac_infect=0.1)
     plt.show()
