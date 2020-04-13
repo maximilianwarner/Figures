@@ -6,6 +6,8 @@ from scipy.spatial.distance import pdist, squareform
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.gridspec as gridspec
+from matplotlib.ticker import ScalarFormatter
 
 # turning on interactive mode for pycharm
 import matplotlib;
@@ -18,28 +20,33 @@ class Population:
     init_state is an [N x 6] array, where N is the number of people.
     It takes the form:
 
-       [[x1, y1, vx1, vy1, i_state1, i_time1],
-        [x2, y2, vx2, vy2, i_state2, i_time2],
+       [[x_1, y_1, vx_1, vy_1, i_state1, i_time1, q_state_1, x_home_1, y_home_2],
+        [x_2, y_2, vx_2, vy_2, i_state2, i_time2, q_state_2, x_home_2, y_home_2],
         ...
-        [xN, yN, vxN, vyN, i_stateN, i_timeN]]
+        [x_N, y_N, vx_N, vy_N, i_stateN, i_timeN, q_state_N, x_home_N, y_home_N]]
 
-    where x1 and y2 are the coordinates,
-    vx1 and vy1 are the velocities,
-    i_state1 is the infection state: 0 = susceptible, 1= infected, -1= immune,
-    i_time1 is the time since infection
+    where x_i and y_i are the coordinates,
+    vx_i and vy_i are the velocities,
+    i_state_i is the infection state: 0= susceptible, 1= infected, -1= immune,
+    i_time_i is the time since infection
+    q_state_i = the quarantine state: 0= not at home, 1= at home,
+    x_home_i and y_home_i are the home coordinates for those at home
 
-    bounds is the size of the box: [xmin, xmax, ymin, ymax]
+    bounds is the size of the box: [x_min, x_max, y_min, y_max]
     """
 
     def __init__(self,
-                 init_state=[[1.0, 0.0, 0.0, -1.0, 0.0, 0.0],
-                             [-0.5, 0.5, 0.5, 0.5, 0.0, 0.0],
-                             [-0.5, -0.5, -0.5, 0.5, 1.0, 0.0]],
+                 init_state=[[ 1.0, 0.0, 0.0,-1.0, 1, 0.0, 1, 1.0, 0.0],
+                             [-0.5, 0.5, 0.5, 0.5, 1, 0.0, 0,-0.5, 0.5],
+                             [-0.5,-0.5,-0.5, 0.5, 0, 1.0, 1,-0.5,-0.5]],
 
                  bounds=[-2, 2, -2, 2],
                  size=0.04,
                  M=0.05,
-                 T_recover=100):
+                 T_recover=100,
+                 q_rad=0.1,
+                 q_frac=0.9,
+                 q_inplace=True):
         """initiate the class"""
         self.init_state = np.asarray(init_state, dtype=float)
         self.M = M * np.ones(self.init_state.shape[0])
@@ -48,6 +55,10 @@ class Population:
         self.time_elapsed = 0
         self.bounds = bounds
         self.T_recover = T_recover
+        self.q_rad = q_rad
+        self.q_frac = q_frac
+        self.q_inplace = q_inplace
+        self.num_people = self.init_state.shape[0]
 
     def step(self, dt):
         """step forward by one time step dt"""
@@ -111,13 +122,15 @@ class Population:
         for i, (state, times) in enumerate(zip(infection_states, infection_times)):
             # increment the time if the person is infected
             if state == 1:
-                self.state[i, 5] += 1
+                self.state[i, 5] += 1/30 # frame rate of 30 fps
 
             # change the state if the person is infected long enough
             if times > self.T_recover and state == 1:
                 self.state[i, 4] = -1
 
-        # check for crossing boundary
+
+
+        # check for crossing absolute boundary
         crossed_x1 = (self.state[:, 0] < self.bounds[0] + self.size)
         crossed_x2 = (self.state[:, 0] > self.bounds[1] - self.size)
         crossed_y1 = (self.state[:, 1] < self.bounds[2] + self.size)
@@ -132,15 +145,43 @@ class Population:
         self.state[crossed_x1 | crossed_x2, 2] *= -1
         self.state[crossed_y1 | crossed_y2, 3] *= -1
 
+        # check for crossing home boundary if quarantine:
+        if self.q_inplace is True:
+            # [x_min, x_max, y_min, y_max]
+            local_bounds = np.hstack(((self.state[:, 7] - self.q_rad).reshape(self.num_people, 1),
+                                      (self.state[:, 7] + self.q_rad).reshape(self.num_people, 1),
+                                      (self.state[:, 8] - self.q_rad).reshape(self.num_people, 1),
+                                      (self.state[:, 8] + self.q_rad).reshape(self.num_people, 1)))
+
+            local_bounds[self.state[:,6] > 0] = self.bounds[:]
+
+            local_crossed_x1 = (self.state[:, 0] < local_bounds[:, 0] + self.size)
+            local_crossed_x2 = (self.state[:, 0] > local_bounds[:, 1] - self.size)
+            local_crossed_y1 = (self.state[:, 1] < local_bounds[:, 2] + self.size)
+            local_crossed_y2 = (self.state[:, 1] > local_bounds[:, 3] - self.size)
+
+            self.state[local_crossed_x1, 0] = local_bounds[local_crossed_x1, 0] + self.size
+            self.state[local_crossed_x2, 0] = local_bounds[local_crossed_x2, 1] - self.size
+
+            self.state[local_crossed_y1, 1] = local_bounds[local_crossed_y1, 2] + self.size
+            self.state[local_crossed_y2, 1] = local_bounds[local_crossed_y2, 3] - self.size
+
+            self.state[local_crossed_x1 | local_crossed_x2, 2] *= -1
+            self.state[local_crossed_y1 | local_crossed_y2, 3] *= -1
 
 class AnimatedScatter(object):
     """an animated scatter plot using the Population class as data input"""
 
-    def __init__(self, num_people=100, T_recover=100, frac_infect=0.1):
+    def __init__(self, num_people=100, T_recover=100, frac_infect=0.1,
+                 q_rad=0.5, q_frac=0.9, q_inplace=True, run_time=40):
         # set the number of people
         self.num_people = num_people
         self.T_recover = T_recover
         self.frac_infect = frac_infect
+        self.q_rad = q_rad
+        self.q_frac = q_frac
+        self.q_inplace = q_inplace
+        self.run_time = run_time
 
         # set up initial state
         np.random.seed(0)
@@ -148,7 +189,7 @@ class AnimatedScatter(object):
         # set up the coordinates and velocities with uniform random distribution
         self.init_state = -0.5 + np.random.random((self.num_people, 4))
 
-        # scale the velocities
+        # scale the locations
         self.init_state[:, :2] *= 4
 
         # now add the infection state and the time of infection
@@ -156,20 +197,47 @@ class AnimatedScatter(object):
                                      np.random.choice(2, self.num_people,
                                                       p=[1 - self.frac_infect, self.frac_infect]).reshape(
                                          self.num_people, 1),
-                                     np.random.randint(9, size=self.num_people).reshape(self.num_people, 1)))
+                                     np.random.randint(9, size=self.num_people).reshape(self.num_people, 1),
+                                     np.random.choice(2, self.num_people,
+                                                      p=[self.q_frac, 1 - self.q_frac]).reshape(
+                                         self.num_people, 1),
+                                     self.init_state[:, :2]))
 
-        self.box = Population(self.init_state, T_recover=self.T_recover)
+        self.box = Population(self.init_state, T_recover=self.T_recover, q_rad=self.q_rad,
+                              q_frac=self.q_frac, q_inplace=self.q_inplace)
         self.dt = 1. / 30  # 30fps
+        self.total_frames = int(self.run_time/self.dt)
 
         # setup the figure and axes
-        self.fig = plt.figure(figsize=(4,12))
+        self.fig = plt.figure(figsize=(12,4))
+        self.gs = self.fig.add_gridspec(nrows=1, ncols=3)
         #self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        self.ax_1 = self.fig.add_subplot(211, aspect='equal', autoscale_on=False, xlim=(-2.1, 2.1), ylim=(-2.1, 2.1))
-        self.ax_2 = self.fig.add_subplot(212, aspect=30,autoscale_on=True, xlim=(0, 40), ylim=(0.1, 1))
+        self.ax_1 = self.fig.add_subplot(self.gs[0, 0], aspect='equal', autoscale_on=False,
+                                         xlim=(-2.1, 2.1), ylim=(-2.1, 2.1))
+        self.ax_2 = self.fig.add_subplot(self.gs[0, 1:], autoscale_on=True,
+                                         xlim=(0, self.run_time), ylim=(self.frac_infect, 1))
+
+        asp = (self.run_time/(-np.log(self.frac_infect)))/1.5
+        self.ax_2.set_aspect(asp)
+
+        self.fig.tight_layout()
 
         # setup FuncAnimation.
-        self.ani = animation.FuncAnimation(self.fig, self.update, interval=5,
-                                           init_func=self.setup_plot, blit=True)
+        self.ani = animation.FuncAnimation(self.fig, self.update, interval=30, frames=self.total_frames,
+                                           init_func=self.setup_plot, blit=True, repeat = False)
+
+        # saving the animation
+        file_name = "num_p-{}_fracinf-{}_Trec-{}_qrad{}_qfrac-{}_q-{}.mp4".format(self.num_people,
+                                                                                  self.frac_infect,
+                                                                                  self.T_recover,
+                                                                                  self.q_rad,
+                                                                                  self.q_frac,
+                                                                                  self.q_inplace)
+
+        # Set up formatting for the movie files
+        Writer = animation.writers['ffmpeg']
+        writer = Writer(fps=30, metadata=dict(artist='Me'), bitrate=1800)
+        self.ani.save(file_name, writer=writer)
 
     def setup_plot(self):
         """initial drawing of the scatter plot."""
@@ -189,17 +257,31 @@ class AnimatedScatter(object):
 
         self.ax_1.add_patch(self.rect)
 
-        # get rid of the spines
-        self.ax_1.tick_params(bottom="off", left="off")
+        # figure title
+        title_str = "Num. = {}, Init. frac. inf. = {}, Inf. time = {}, Quar. rad. = {}, Quar. frac. = {}".format(
+            self.num_people,
+            self.frac_infect,
+            self.T_recover,
+            self.q_rad,
+            self.q_frac)
+        self.fig.suptitle(title_str, fontsize=16)
+
+        # get rid of the spines for the population
+        self.ax_1.set_xticks([])
+        self.ax_1.set_yticks([])
         edges = ['left', 'right', 'top', 'bottom']
         for edge in edges:
             self.ax_1.spines[edge].set_visible(False)
 
-
-
         # set up the timeline plot
         self.line, = self.ax_2.plot([], [], lw=2)
         self.ax_2.set_yscale('log')
+
+        # get
+        formatter = ScalarFormatter()
+        formatter.set_scientific(False)
+        self.ax_2.yaxis.set_major_formatter(formatter)
+        self.ax_2.minorticks_off()
 
         # set up the time, cumulative infected and infected arrays
         self.t = []
@@ -234,8 +316,9 @@ class AnimatedScatter(object):
 
 
 def main():
-    a = AnimatedScatter(num_people=100, T_recover=200, frac_infect=0.1)
-    plt.show()
+    a = AnimatedScatter(num_people=900, T_recover=8, frac_infect=0.01,
+                        q_rad=0.05, q_frac=0.75, q_inplace=True, run_time=40)
+    #plt.show()
 
 
 if __name__ == '__main__':
